@@ -184,8 +184,8 @@ python posters/mxplayer.py "https://www.mxplayer.in/show/..."
 ## ⚖️ Disclaimer
 [!WARNING]
 
-Educational Purposes Only: This project is developed strictly for educational, research, and personal automation purposes.
+**Educational Purposes Only**: This project is developed strictly for educational, research, and personal automation purposes.
 
-Intellectual Property: All titles, posters, logos, and media assets extracted by this scraper are the sole property of their respective OTT platforms, creators, and distributors. This tool does not host, store, or redistribute any media files; it merely fetches publicly available metadata URLs.
+**Intellectual Property**: All titles, posters, logos, and media assets extracted by this scraper are the sole property of their respective OTT platforms, creators, and distributors. This tool does not host, store, or redistribute any media files; it merely fetches publicly available metadata URLs.
 
-Terms of Service: Using automation or scraping tools may violate the Terms of Service of certain platforms. The developer assumes no liability for any misuse of this tool, account suspensions, or legal actions resulting from the use of this software. Use it at your own risk.
+**Terms of Service**: Using automation or scraping tools may violate the Terms of Service of certain platforms. The developer assumes no liability for any misuse of this tool, account suspensions, or legal actions resulting from the use of this software. Use it at your own risk.
