@@ -1,4 +1,4 @@
-# 🎬 Posters API — Multi-OTT Poster Scraper
+# 🎬 AnimeCall Posters API — Multi-OTT Poster Scraper
 
 A fast, modular **FastAPI** service that extracts **title, landscape, portrait, cover, logo, and thumbnails** from major OTT platforms using lightweight scraping and JSON parsing.
 
