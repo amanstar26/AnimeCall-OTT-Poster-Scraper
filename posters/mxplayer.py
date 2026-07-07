@@ -27,20 +27,20 @@ def extract_title_from_h1(html_text):
 
 #Transform Bigpic URL
 def transform_bigpic_url(original_url):
-    match = re.match(r"(.*?/16x9/)([^/]+)/(.*?)(_badged_\d+)?(\.jpg)", original_url)
+    match = re.match(r"(.*?/16x9/)[^/]+/(.*?)(\.jpg)", original_url)
     if match:
         base_url = match.group(1)
-        filename = match.group(3)
+        filename = match.group(2)
         return f"{base_url}3840x2160/{filename}.jpg"
     return None
 
 
 #Transform Portrait URL
 def transform_portrait_url(original_url):
-    match = re.match(r"(.*?/2x3/)([^/]+)/(.*?)(_badged_\d+)?(\.jpg)", original_url)
+    match = re.match(r"(.*?/2x3/)[^/]+/(.*?)(\.jpg)", original_url)
     if match:
         base_url = match.group(1)
-        filename = match.group(3)
+        filename = match.group(2)
         return f"{base_url}640x960/{filename}.jpg"
     return None
 
