@@ -10,84 +10,14 @@ from Crypto.Hash import MD5
 
 router = APIRouter()
 
-PASSWORD = "Aryan_Hijra_2026ka"
-
-
-# ---------------- CRYPTO HELPERS ----------------
-
-def evp_bytes_to_key(password: bytes, salt: bytes, key_len: int, iv_len: int):
-    dt = b""
-    md5_hash = b""
-    while len(dt) < key_len + iv_len:
-        md5 = MD5.new()
-        md5.update(md5_hash + password + salt)
-        md5_hash = md5.digest()
-        dt += md5_hash
-    return dt[:key_len], dt[key_len:key_len + iv_len]
-
-
-def openssl_decrypt(enc_b64: str, password: str):
-    raw = base64.b64decode(enc_b64)
-
-    if raw[:8] != b"Salted__":
-        raise ValueError("Invalid OpenSSL data")
-
-    salt = raw[8:16]
-    ciphertext = raw[16:]
-
-    key, iv = evp_bytes_to_key(password.encode(), salt, 32, 16)
-
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    pt = cipher.decrypt(ciphertext)
-
-    pad = pt[-1]
-    return pt[:-pad].decode("utf-8", errors="ignore")
-
-
-# ---------------- CORE LOGIC ----------------
-
-def fetch_netflix_metadata(netflix_url: str):
-    if "netflix.com" not in netflix_url:
-        netflix_url = f"https://www.netflix.com/title/{netflix_url}"
-
-    session = requests.Session(impersonate="chrome")
-
-    api = "https://postersuniverse.pages.dev/api/metadata"
-
-    res = session.get(api, params={"url": netflix_url}, timeout=20)
-
-    if res.status_code != 200:
-        return {"error": f"API failed {res.status_code}", "details": res.text}
-
-    try:
-        j = res.json()
-    except Exception:
-        return {"error": "Invalid JSON from API", "raw": res.text}
-
-    enc = j.get("data")
-    if not enc:
-        return {"error": "Encrypted data missing", "raw": j}
-
-    try:
-        decrypted = openssl_decrypt(enc, PASSWORD)
-        data = json.loads(decrypted)
-    except Exception as e:
-        return {"error": "Decrypt failed", "details": str(e)}
-
-    box = data.get("boxarts", {})
-    cover,logo = fetch_primary_metadata(data.get("nfid") or data.get("video_id"))
-    year = data.get("availability", {}).get("year")
-    return {
-        "title": f"{data.get('title')} - ({year})" if year else data.get("title"),
-        "portrait": box.get("poster_426x607") or box.get("poster_166x236"),
-        "cover": cover,
-        "logo": logo,
-        "landscape": box.get("storyArt_1920x1080"),
-    }
-
 NETFLIX_GRAPHQL_URL = "https://web.prod.cloud.netflix.com/graphql"
 
-def fetch_primary_metadata(video_id: str) -> dict:
+def fetch_primary_metadata(video_url: str):
+    # Extract video ID from URL
+    video_id = re.search(r"/(title|watch)/(\d+)", video_url).group(2)
+    print(f"Fetching metadata for Netflix video ID: {video_id}")
+
+    # Base payload (shared for both requests)
     payload = {
         "operationName": "MiniModalQuery",
         "variables": {
@@ -118,29 +48,75 @@ def fetch_primary_metadata(video_id: str) -> dict:
         "user-agent": "Mozilla/5.0"
     }
 
+    # ---------- First request: English (default) ----------
     response = requests.post(
         NETFLIX_GRAPHQL_URL,
         headers=headers,
         json=payload,
         timeout=15
     )
-
     if response.status_code != 200:
-        raise Exception(f"Netflix API error: {response.status_code}")
+        raise Exception(f"Netflix API error (English): {response.status_code}")
 
     data = response.json()
     content = data["data"]["unifiedEntities"]
 
-    for item in content:
-        cover = item.get("storyArt", {}).get("url")
-        logo = item.get("titleLogoUnbranded", {}).get("url")
-        return cover,logo
+    # Extract basic metadata from the first entity (assuming at least one exists)
+    # We'll use the first item, but you could also loop to find the correct one
+    item = content[0] if content else {}
+    title = item.get("title")
+    year = item.get("availabilityStartTime", "").split("-")[0]
+    landscape = item.get("boxartHighRes", {}).get("url")          # English landscape
+    cover = item.get("storyArt", {}).get("url")
+    logo = item.get("titleLogoUnbranded", {}).get("url")
+
+    # ---------- Second request: Hindi (hi-in) ----------
+    hindi_headers = headers.copy()
+    hindi_headers["x-netflix.context.locales"] = "hi-in"
+
+    try:
+        hindi_response = requests.post(
+            NETFLIX_GRAPHQL_URL,
+            headers=hindi_headers,
+            json=payload,
+            timeout=15
+        )
+        if hindi_response.status_code == 200:
+            hindi_data = hindi_response.json()
+            hindi_content = hindi_data["data"]["unifiedEntities"]
+            if hindi_content:
+                hindi_item = hindi_content[0]
+                # Get the Hindi boxart; verify the key contains "|hi" to be safe
+                boxart = hindi_item.get("boxartHighRes", {})
+                if boxart.get("key") and "|hi" in boxart["key"]:
+                    hindi_landscape = boxart.get("url")
+                else:
+                    # Fallback: still use the URL, but log a warning
+                    print("Warning: Hindi boxart key does not contain '|hi'")
+                    hindi_landscape = boxart.get("url")
+            else:
+                hindi_landscape = None
+        else:
+            print(f"Hindi request failed with status {hindi_response.status_code}")
+            hindi_landscape = None
+    except Exception as e:
+        print(f"Error fetching Hindi landscape: {e}")
+        hindi_landscape = None
+
+    # Build return dict with the new key
+    return {
+        "title": f"{title} - ({year})" if year else title,
+        "landscape": landscape,                 # English
+        "hindi_landscape": hindi_landscape,     # New key
+        "cover": cover,
+        "logo": logo
+    }
 
 # ---------------- FASTAPI ROUTE ----------------
 
 @router.get("/nf")
 def netflix_poster(url: str = Query(..., description="Netflix URL or Title ID")):
-    result = fetch_netflix_metadata(url)
+    result = fetch_primary_metadata(url)
 
     if "error" in result:
         return JSONResponse(content=result, status_code=400)
