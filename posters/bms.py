@@ -22,16 +22,18 @@ def bms(url: str):
                 movie_title = clean_match.group(1)
 
         # --- Extract images ---
-        pattern = r"https://assets-in\.bmscdn\.com/discovery-catalog/events/[^\s\"']+"
+        pattern = r"https://assets-in\.bmscdn\.com/(?:discovery-catalog/events|iedb/movies/images)/[^\s\"']+"
         matches = list(set(re.findall(pattern, html)))
         images = {}
-        for u in matches:
-            if "landscape" in u:
-                images["landscape"] = u
-            elif "portrait" in u:
-                # remove any transformations
-                images["portrait"] = re.sub(r"tr:[^/]+/", "", u)
 
+        for u in matches:
+            # Clean up transformations if present
+            clean_url = re.sub(r"tr:[^/]+/", "", u)
+
+            if "landscape" in u:
+                images["landscape"] = clean_url
+            elif "portrait" in u or "thumbnail" in u:
+                images["portrait"] = clean_url
         return {
             "title": movie_title,
             "landscape": images.get("landscape"),
